@@ -44,13 +44,14 @@
             margin-bottom: 10px;
             border-radius: 5px;
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
             align-items: center;
         }
 
         .audio-player {
             width: 100%;
             max-width: 300px;
+            margin-bottom: 10px;
         }
 
         .button {
@@ -66,6 +67,11 @@
 
         .button:hover {
             background-color: #800000;
+        }
+
+        .similarity-score {
+            font-weight: bold;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -89,30 +95,28 @@
     </div>
 
     <script>
-        // Fetch the stored audio files from localStorage
-        const file1 = localStorage.getItem('file1');
-        const file2 = localStorage.getItem('file2');
-
+        // Fetch the stored audio files and similarity scores from localStorage
         const recordingsList = document.getElementById('recordingsList');
+        const recordings = JSON.parse(localStorage.getItem('recordings')) || [];
 
         // If there are recordings in localStorage, display them as audio players
-        if (file1 && file2) {
-            recordingsList.innerHTML = `
-                <li class="recording-item">
-                    <h3>Recording 1</h3>
-                    <audio controls class="audio-player">
-                        <source src="${file1}" type="audio/mpeg">
-                        Your browser does not support the audio element.
-                    </audio>
-                </li>
-                <li class="recording-item">
-                    <h3>Recording 2</h3>
-                    <audio controls class="audio-player">
-                        <source src="${file2}" type="audio/mpeg">
-                        Your browser does not support the audio element.
-                    </audio>
-                </li>
-            `;
+        if (recordings.length > 0) {
+            recordings.forEach((recording, index) => {
+                recordingsList.innerHTML += `
+                    <li class="recording-item">
+                        <h3>Recording Pair ${index + 1}</h3>
+                        <audio controls class="audio-player">
+                            <source src="${recording.file1}" type="audio/mpeg">
+                            Your browser does not support the audio element.
+                        </audio>
+                        <audio controls class="audio-player">
+                            <source src="${recording.file2}" type="audio/mpeg">
+                            Your browser does not support the audio element.
+                        </audio>
+                        <div class="similarity-score">Similarity Score: ${recording.similarity} %</div>
+                    </li>
+                `;
+            });
         } else {
             // If there are no recordings, show a message
             recordingsList.innerHTML = '<p>No recordings found. Please upload files on the main page.</p>';
