@@ -13,7 +13,6 @@
             min-height: 100vh;
         }
 
-        /* Header styling */
         .header {
             background-color: #C21807;
             color: white;
@@ -21,7 +20,6 @@
             text-align: center;
         }
 
-        /* Main content styling */
         .content {
             flex: 1;
             display: flex;
@@ -29,9 +27,9 @@
             justify-content: center;
             align-items: center;
             text-align: center;
+            padding: 20px;
         }
 
-        /* Button styling */
         .button {
             background-color: #C21807;
             color: white;
@@ -47,12 +45,10 @@
             background-color: #800000;
         }
 
-        /* Hidden file input styling */
         .file-input {
             display: none;
         }
 
-        /* Label styling to act as buttons */
         .file-label {
             display: inline-block;
             background-color: #C21807;
@@ -68,7 +64,6 @@
             background-color: #800000;
         }
 
-        /* Footer styling */
         .footer {
             background-color: #C21807;
             color: white;
@@ -88,12 +83,10 @@
     <div class="content">
         <h2>Upload Two Audios to Compare</h2>
         <form id="uploadForm" style="display: flex; flex-direction: column; align-items: center;">
-            <!-- File inputs -->
             <input type="file" id="file1" class="file-input" required>
             <label for="file1" class="file-label">Upload Audio 1</label>
             <input type="file" id="file2" class="file-input" required>
             <label for="file2" class="file-label">Upload Audio 2</label>
-            <!-- Submit button -->
             <button type="submit" class="button">Upload & Compare</button>
         </form>
         <div id="result"></div>
@@ -101,14 +94,12 @@
 
     <!-- Footer section -->
     <div class="footer">
-        <button class="button" onclick="window.location.href='index.html';">Main Page</button>
-        <button class="button" onclick="window.location.href='pastrecordings.html';">View Past Recordings</button> 
+        <button class="button" onclick="window.location.href='pastrecordings.html';">View Past Recordings</button>
     </div>
 
     <!-- TensorFlow.js -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
 
-    <!-- JavaScript to handle audio upload and comparison -->
     <script>
         document.getElementById('uploadForm').onsubmit = async function(event) {
             event.preventDefault();
@@ -127,13 +118,8 @@
 
             try {
                 // Convert the audio files to tensors
-                console.log('Converting file 1 to tensor...');
                 const tensor1 = await audioFileToTensor(file1);
-                console.log('File 1 converted successfully:', tensor1);
-
-                console.log('Converting file 2 to tensor...');
                 const tensor2 = await audioFileToTensor(file2);
-                console.log('File 2 converted successfully:', tensor2);
 
                 // Trim the longer tensor to match the shorter tensor
                 const trimmedTensors = trimTensorsToSameLength(tensor1, tensor2);
@@ -141,71 +127,76 @@
                 const trimmedTensor2 = trimmedTensors[1];
 
                 // Calculate similarity between the trimmed tensors
-                console.log('Calculating similarity...');
                 const similarity = calculateCosineSimilarity(trimmedTensor1, trimmedTensor2);
-                console.log('Similarity calculated:', similarity);
+                const similarityPercentage = clampPercentage((similarity * 100).toFixed(2)); // Convert to percentage and clamp
 
-                // Display the similarity result
-                document.getElementById('result').innerText = 'Similarity Score: ' + similarity.toFixed(2);
+                // Save the audio files and similarity score to localStorage (in Base64)
+                await saveRecordings(file1, file2, similarityPercentage);
+
+                // Redirect to result page
+                window.location.href = 'results.html';
             } catch (error) {
                 console.error('An error occurred during processing:', error);
                 document.getElementById('result').innerText = 'An error occurred during processing. See console for details.';
             }
         }
 
-        // Function to process the audio file into a tensor
         async function audioFileToTensor(file) {
-            try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const fileData = await file.arrayBuffer();
-                console.log('File data loaded successfully.');
-                const audioBuffer = await audioContext.decodeAudioData(fileData);
-                console.log('Audio buffer decoded successfully.');
-
-                // Take only the first channel for simplicity
-                const channelData = audioBuffer.getChannelData(0);
-                console.log('Channel data extracted:', channelData);
-
-                // Convert the audio data to a TensorFlow.js tensor
-                return tf.tensor(channelData);
-            } catch (error) {
-                console.error('Error processing audio file:', error);
-                throw error;
-            }
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const fileData = await file.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(fileData);
+            const channelData = audioBuffer.getChannelData(0); // Take only the first channel
+            return tf.tensor(channelData);
         }
 
-        // Function to calculate cosine similarity between two tensors
         function calculateCosineSimilarity(tensor1, tensor2) {
-            try {
-                // Calculate the dot product
-                const dotProduct = tf.sum(tf.mul(tensor1, tensor2)).arraySync();
-                // Calculate magnitudes (Euclidean norm)
-                const magnitude1 = tf.sqrt(tf.sum(tf.square(tensor1))).arraySync();
-                const magnitude2 = tf.sqrt(tf.sum(tf.square(tensor2))).arraySync();
-
-                // Return the cosine similarity
-                return dotProduct / (magnitude1 * magnitude2);
-            } catch (error) {
-                console.error('Error calculating similarity:', error);
-                throw error;
-            }
+            const dotProduct = tf.sum(tf.mul(tensor1, tensor2)).arraySync();
+            const magnitude1 = tf.sqrt(tf.sum(tf.square(tensor1))).arraySync();
+            const magnitude2 = tf.sqrt(tf.sum(tf.square(tensor2))).arraySync();
+            return dotProduct / (magnitude1 * magnitude2);
         }
 
-        // Function to trim tensors to the same length
         function trimTensorsToSameLength(tensor1, tensor2) {
             const length1 = tensor1.shape[0];
             const length2 = tensor2.shape[0];
-
             const minLength = Math.min(length1, length2);
+            return [tensor1.slice([0], [minLength]), tensor2.slice([0], [minLength])];
+        }
 
-            // Slice tensors to the same length
-            const trimmedTensor1 = tensor1.slice([0], [minLength]);
-            const trimmedTensor2 = tensor2.slice([0], [minLength]);
+        async function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
 
-            return [trimmedTensor1, trimmedTensor2];
+        async function saveRecordings(file1, file2, similarity) {
+            const base64File1 = await fileToBase64(file1);
+            const base64File2 = await fileToBase64(file2);
+
+            const recordings = JSON.parse(localStorage.getItem('recordings')) || [];
+            recordings.unshift({ 
+                file1: base64File1, 
+                file2: base64File2, 
+                similarity 
+            });
+
+            if (recordings.length > 3) {
+                recordings.length = 3; // Keep only the last 3 recordings
+            }
+
+            localStorage.setItem('recordings', JSON.stringify(recordings));
+            localStorage.setItem('similarityScore', similarity); // Save the similarity score
+        }
+
+        function clampPercentage(value) {
+            return Math.max(0, Math.min(100, value));
         }
     </script>
-
+</body>
+</html>
 
 
 
